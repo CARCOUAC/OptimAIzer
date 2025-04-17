@@ -105,4 +105,4 @@ pip install --upgrade pip
 pip install -e .
 
 # Notify the user that the project setup is complete
-echo -e "\n\033[1;32mProject ready. Activate the environment with: source venv/bin/activate\033[0m\n"
+echo -e "\nProject ready, you can activate the environment with : \033[1;32msource $(pwd)/venv/bin/activate\033[0m\n"
