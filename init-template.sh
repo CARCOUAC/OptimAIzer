@@ -3,7 +3,7 @@
 # -------------------------------------------------------
 #                  INIT-PROJECT TEMPLATE
 # Bootstrap a Python project with optional Docker files,
-# structure (src/tests), virtual environment, and setup.
+# structure (src/tests), virtual environment, Git setup.
 # -------------------------------------------------------
 
 cd "$(dirname "$0")"
@@ -88,7 +88,7 @@ validate_step() {
 }
 
 ask_package_name() {
-    local prompt="➔  Enter a name for the source directory (empty for 'src') : "
+    local prompt="➔  Source directory (empty for 'src') : "
     local input
 
     if [[ "$auto" == true ]]; then
@@ -108,6 +108,46 @@ ask_package_name() {
         echo -e "\n$(to_red "Invalid name. Installation canceled.")\n"
         exit 1
     fi
+}
+
+# --------------------[ GIT SETUP ]--------------------
+
+init_git() {
+    git init > /dev/null 2>&1
+    validate_step "Initialized Git repository"
+
+    git config user.name &> /dev/null || git config user.name "Your Name"
+    git config user.email &> /dev/null || git config user.email "you@example.com"
+    validate_step "Configured Git user (if missing)"
+
+    cat <<EOF > .gitignore
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual env
+venv/
+.env/
+.venv/
+
+# Build
+*.egg-info/
+build/
+dist/
+
+# Logs, IDEs
+*.log
+*.swp
+*.tmp
+.idea/
+.vscode/
+EOF
+    validate_step "Created .gitignore"
+
+    git add . > /dev/null
+    git commit -m "Initial commit" > /dev/null
+    git branch -M main
+    validate_step "First commit created on 'main' branch"
 }
 
 # --------------------[ PYTHON BINARY SELECTION ]--------------------
@@ -136,7 +176,7 @@ select_python_binary() {
         return
     fi
 
-    if ask_yes_no " Use this Python interpreter? [Y/n]:" "Y"; then
+    if ask_yes_no " Use this Python interpreter? [Y/n] :" "Y"; then
         python_binary="$default_path"
         python_version="$default_version"
         return
@@ -153,7 +193,7 @@ select_python_binary() {
     echo "  $(to_green "[M] Enter manually")"
 
     while true; do
-        read -rp $'\n➔ Choose a Python interpreter (number or M): ' choice
+        read -rp $'\n➔  Choose a Python interpreter [number/M] : ' choice
         if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#python_bins[@]} )); then
             python_binary="${python_bins[$((choice-1))]%%|*}"
             python_version="${python_bins[$((choice-1))]##*|}"
@@ -177,37 +217,44 @@ select_python_binary() {
 
 # --------------------[ SCRIPT EXECUTION ]--------------------
 
-echo ""
 select_python_binary
+
+echo ""
+
 ask_package_name
 
 generate_dockerfiles=false
-if ask_yes_no " Generate a Dockerfile and .dockerignore? [Y/n]:" "Y"; then
+if ask_yes_no " Generate Dockerfile and .dockerignore? [Y/n] :" "Y"; then
     generate_dockerfiles=true
 fi
 
+setup_git=false
+if ask_yes_no " Initialize Git repository? [Y/n] :" "Y"; then
+    setup_git=true
+fi
+
 install_path="$(pwd)"
-echo -e "\n$(to_bold "Configuration Summary:")"
-echo -e "-----------------------"
+echo -e "\n--- 🛠️  $(to_bold "Configuration Summary") ---"
 echo -e "🐍 Python version      : $(to_bold "$python_version")"
-echo -e "🔧 Python base binary  : $(to_blue "$python_binary")"
-echo -e "💼 Package name        : $(to_blue "$src_name")"
-echo -e "📁 Installation path   : $(to_green "$install_path")"
+echo -e "📄 Python base binary  : $(to_blue "$python_binary")"
+echo -e "📁 Installation path   : $(to_blue "$install_path")"
+echo -e "📦 Package name        : $(to_blue "$src_name")"
 echo -e "🐳 Docker config files : $([[ "$generate_dockerfiles" == true ]] && to_green "Yes" || to_red "No")"
+echo -e "🐙 Git initialized     : $([[ "$setup_git" == true ]] && to_green "Yes" || to_red "No")"
 echo ""
 
-if ! ask_yes_no " Continue? [Y/n]:" "Y"; then
+if ! ask_yes_no " Continue ? [Y/n] :" "Y"; then
     echo -e "\n$(to_red "Installation canceled.")\n"
     exit 1
 fi
 
+echo -e "\n--- 📁 PROJECT ----------------"
 mkdir -p "$src_name"
+mkdir -p "tests"
 touch "$src_name/__init__.py"
 touch "$src_name/main.py"
-mkdir -p "$src_name/tests"
-touch "$src_name/tests/test_main.py"
-touch "$src_name/tests/__init__.py"
-validate_step "Created source and tests directories"
+touch "tests/test_main.py"
+validate_step "Created $src_name package tree"
 
 if [[ "$generate_dockerfiles" == true ]]; then
     cat <<EOF > Dockerfile
@@ -237,6 +284,7 @@ EOF
 Dockerfile
 init-template.sh
 EOF
+    echo -e "\n--- 🐳 DOCKER -----------------"
     validate_step "Created Dockerfile and .dockerignore"
 fi
 
@@ -250,6 +298,7 @@ setup(
     packages=find_packages(),
 )
 EOF
+echo -e "\n--- 🐍 PYTHON -----------------"
 validate_step "Created setup.py and requirements.txt"
 
 "$python_binary" -m venv venv
@@ -266,4 +315,10 @@ else
 fi
 validate_step "Dependencies installed"
 
-echo -e "\n$(to_green "Project ready!") Activate your venv with: $(to_green "source $(pwd)/venv/bin/activate")\n"
+if [[ "$setup_git" == true || "$auto" == true ]]; then
+    echo -e "\n--- 🐙 GIT --------------------"
+    init_git
+fi
+
+echo -e "\n✅ $(to_green "Project ready ")"
+echo -e "\nActivate venv : $(to_green "source $(pwd)/venv/bin/activate")\n"
