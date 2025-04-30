@@ -42,6 +42,7 @@ fi
 BLUE="\033[1;34m"
 GREEN="\033[1;32m"
 RED="\033[1;31m"
+ORANGE='\e[38;5;208m'
 BOLD="\033[1m"
 RESET="\033[0m"
 
@@ -49,6 +50,7 @@ RESET="\033[0m"
 to_blue()   { echo -e "${BLUE}$1${RESET}"; }
 to_green()  { echo -e "${GREEN}$1${RESET}"; }
 to_red()    { echo -e "${RED}$1${RESET}"; }
+to_orange() { echo -e "${ORANGE}$1${RESET}"; }
 to_bold()   { echo -e "${BOLD}$1${RESET}"; }
 
 # --------------------[ UTILITY FUNCTIONS ]--------------------
@@ -59,7 +61,7 @@ ask_yes_no() {
     local response
 
     if [[ "$auto" == true ]]; then
-        echo -e "$prompt $(to_green Y) (auto)"
+        echo -e "$prompt $(to_green Y) $(to_orange \(auto\))"
         return 0
     fi
 
@@ -93,7 +95,7 @@ ask_package_name() {
 
     if [[ "$auto" == true ]]; then
         src_name="src"
-        echo -e "$prompt$(to_blue "$src_name") (auto)"
+        echo -e "$prompt$(to_blue "$src_name") $(to_orange \(auto\))"
         return
     fi
 
@@ -172,7 +174,7 @@ select_python_binary() {
     if [[ "$auto" == true ]]; then
         python_binary="$default_path"
         python_version="$default_version"
-        echo -e "Using $(to_blue "$python_binary") (auto)"
+        echo -e "Using $(to_blue "$python_binary") $(to_orange \(auto\))"
         return
     fi
 
@@ -217,10 +219,10 @@ select_python_binary() {
 
 # --------------------[ SCRIPT EXECUTION ]--------------------
 
-select_python_binary
-
 echo ""
+[ "$auto" = true ] && echo -e "$(to_orange "Automatic install")\n"
 
+select_python_binary
 ask_package_name
 
 generate_dockerfiles=false
@@ -250,10 +252,12 @@ fi
 
 echo -e "\n--- 📁 PROJECT ----------------"
 mkdir -p "$src_name"
-mkdir -p "tests"
 touch "$src_name/__init__.py"
 touch "$src_name/main.py"
-touch "tests/test_main.py"
+
+mkdir -p "$src_name/tests"
+touch "$src_name/tests/test_main.py"
+
 validate_step "Created $src_name package tree"
 
 if [[ "$generate_dockerfiles" == true ]]; then
@@ -288,7 +292,12 @@ EOF
     validate_step "Created Dockerfile and .dockerignore"
 fi
 
-touch "requirements.txt"
+cat <<EOF > "requirements.txt"
+pytest
+loguru
+icecream
+EOF
+
 cat <<EOF > "setup.py"
 from setuptools import setup, find_packages
 
@@ -308,9 +317,11 @@ source venv/bin/activate
 
 if [[ "$verbose" == true ]]; then
     pip install --upgrade pip
+    pip install -r requirements.txt
     pip install -e .
 else
     pip install --upgrade pip > /dev/null 2>&1
+    pip install -r requirements.txt > /dev/null 2>&1
     pip install -e . > /dev/null 2>&1
 fi
 validate_step "Dependencies installed"
